@@ -121,7 +121,7 @@ def render_answer_key_page(
     page_number: int,
     mazes: Sequence[MazeData],
     page_spec: PageSpec,
-    title: str = "ANSWER KEY: ROAD TRIP MAZES",
+    title: str | None = None,
     total_pages: int | None = None,
     layout: str = "auto",
 ) -> None:
@@ -135,11 +135,18 @@ def render_answer_key_page(
     content = page_spec.get_content_rect(page_number)
     register_activitybook_fonts()
 
+    if title is None:
+        from activitybook.activities.maze_activity import ROAD_TRIP_SCENARIOS
+        is_road_trip = any(m.title in [s.title for s in ROAD_TRIP_SCENARIOS] for m in mazes)
+        resolved_title = "ANSWER KEY: ROAD TRIP MAZES" if is_road_trip else "ANSWER KEY: EVERYDAY ADVENTURES"
+    else:
+        resolved_title = title
+
     # 1. Header
     header_y = content.y1 - 12.0
     c.setFont(FONT_BOLD, 14.0)
     c.setFillColorRGB(0.0, 0.0, 0.0)
-    c.drawCentredString(content.x0 + content.width / 2.0, header_y, title)
+    c.drawCentredString(content.x0 + content.width / 2.0, header_y, resolved_title)
 
     # Subtitle line
     c.setFont(FONT_REGULAR, 9.0)
@@ -164,13 +171,23 @@ def render_answer_key_page(
     # Automatic layout selection
     resolved_layout = layout
     if resolved_layout == "auto":
-        resolved_layout = "4-up" if len(mazes) <= 4 else "6-up"
+        if len(mazes) <= 4:
+            resolved_layout = "4-up"
+        elif len(mazes) == 5:
+            resolved_layout = "5-up"
+        else:
+            resolved_layout = "6-up"
 
     if resolved_layout == "4-up":
         cols_count = 2
         rows_count = 2
         thumb_side = 180.0
         solution_lw = 2.6
+    elif resolved_layout == "5-up":
+        cols_count = 2
+        rows_count = 3
+        thumb_side = 148.0
+        solution_lw = 2.4
     else:  # default '6-up'
         cols_count = 2
         rows_count = 3
@@ -180,15 +197,50 @@ def render_answer_key_page(
     col_width = avail_width / float(cols_count)
     row_height = avail_height / float(rows_count)
 
+    max_items = 5 if resolved_layout == "5-up" else cols_count * rows_count
     # 3. Draw each maze solution thumbnail
-    for idx, maze in enumerate(mazes[: cols_count * rows_count]):
-        col_idx = idx % cols_count
-        row_idx = idx // cols_count
+    for idx, maze in enumerate(mazes[:max_items]):
+        if resolved_layout == "5-up":
+            if idx < 4:
+                col_idx = idx % 2
+                row_idx = idx // 2
+                cell_x0 = content.x0 + col_idx * col_width
+            else:
+                # 5th item: centered horizontally on the bottom row
+                row_idx = 2
+                cell_x0 = content.x0 + (avail_width - col_width) / 2.0
+            cell_y_top = avail_top - row_idx * row_height
 
-        cell_x0 = content.x0 + col_idx * col_width
-        cell_y_top = avail_top - row_idx * row_height
+            block_h = 10.5 + 8.5 + 6.5 + thumb_side
+            v_pad = (row_height - block_h) / 2.0
 
-        if resolved_layout == "4-up":
+            label_y = cell_y_top - v_pad - 10.0
+            c.setFont(FONT_BOLD, 10.0)
+            c.setFillColorRGB(0.0, 0.0, 0.0)
+            c.drawCentredString(
+                cell_x0 + col_width / 2.0,
+                label_y,
+                f"{maze.maze_id} ({maze.difficulty.display_name})",
+            )
+
+            # Scenario title line
+            sub_y = label_y - 11.5
+            c.setFont(FONT_ITALIC, 8.0)
+            c.setFillColorRGB(0.3, 0.3, 0.3)
+            c.drawCentredString(
+                cell_x0 + col_width / 2.0,
+                sub_y,
+                maze.title,
+            )
+
+            thumb_x0 = cell_x0 + (col_width - thumb_side) / 2.0
+            thumb_y0 = sub_y - 6.5 - thumb_side
+        elif resolved_layout == "4-up":
+            col_idx = idx % cols_count
+            row_idx = idx // cols_count
+            cell_x0 = content.x0 + col_idx * col_width
+            cell_y_top = avail_top - row_idx * row_height
+
             # Enhanced 4-up: larger thumbnails vertically centered in each row
             block_h = 13.0 + 11.0 + 8.0 + thumb_side
             v_pad = (row_height - block_h) / 2.0
@@ -215,6 +267,11 @@ def render_answer_key_page(
             thumb_x0 = cell_x0 + (col_width - thumb_side) / 2.0
             thumb_y0 = sub_y - 7.0 - thumb_side
         else:
+            col_idx = idx % cols_count
+            row_idx = idx // cols_count
+            cell_x0 = content.x0 + col_idx * col_width
+            cell_y_top = avail_top - row_idx * row_height
+
             # 6-up layout
             block_h = 12.0 + 8.0 + thumb_side
             v_pad = (row_height - block_h) / 2.0
@@ -258,6 +315,7 @@ def build_answer_key_pages(
     page_spec: PageSpec,
     per_page: int = 6,
     total_book_pages: int | None = None,
+    title: str | None = None,
 ) -> int:
     """Render one or more answer key pages for a sequence of mazes.
 
@@ -269,14 +327,20 @@ def build_answer_key_pages(
 
     for i in range(0, len(mazes), per_page):
         batch = mazes[i : i + per_page]
-        layout = "4-up" if len(batch) <= 4 else "6-up"
+        if len(batch) <= 4:
+            batch_layout = "4-up"
+        elif len(batch) == 5:
+            batch_layout = "5-up"
+        else:
+            batch_layout = "6-up"
         render_answer_key_page(
             c,
             page_number=cur_page,
             mazes=batch,
             page_spec=page_spec,
+            title=title,
             total_pages=total_book_pages,
-            layout=layout,
+            layout=batch_layout,
         )
         c.showPage()
         cur_page += 1

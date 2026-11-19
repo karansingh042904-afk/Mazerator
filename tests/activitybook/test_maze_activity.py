@@ -14,10 +14,13 @@ import pypdf
 from reportlab.pdfgen import canvas
 
 from activitybook.activities.maze_activity import (
+    EVERYDAY_ADVENTURE_SCENARIOS,
     MazeData,
     MazeDifficulty,
     ROAD_TRIP_SCENARIOS,
+    build_everyday_adventures_sample_pdf,
     build_road_trip_sample_pdf,
+    generate_adventure_maze,
     generate_road_trip_maze,
     render_maze_page,
 )
@@ -26,7 +29,9 @@ from activitybook.activities.answer_key import (
     render_answer_key_page,
     render_maze_solution_thumbnail,
 )
+from activitybook.activities.adventure_icons import ADVENTURE_ICONS
 from activitybook.activities.road_trip_icons import ROAD_TRIP_ICONS
+from activitybook.core.fonts import inspect_pdf_fonts
 from activitybook.core.page_spec import PageSpec, TRIM_7X10
 from maze_generator import generate_mazes as gm
 
@@ -230,6 +235,21 @@ class TestAnswerKey(unittest.TestCase):
             self.assertIn("Maze 7", text)
             self.assertIn("Maze 10", text)
 
+    def test_render_answer_key_page_5up(self):
+        """Verify 5-up layout with larger thumbnails and centered 5th item."""
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+            c = canvas.Canvas(tmp.name, pagesize=(self.spec.width_points, self.spec.height_points))
+            render_answer_key_page(c, page_number=11, mazes=self.mazes[:5], page_spec=self.spec, layout="5-up")
+            c.showPage()
+            c.save()
+
+            reader = pypdf.PdfReader(tmp.name)
+            self.assertEqual(len(reader.pages), 1)
+            text = reader.pages[0].extract_text()
+            self.assertIn("ANSWER KEY", text)
+            self.assertIn("Maze 1", text)
+            self.assertIn("Maze 5", text)
+
     def test_build_answer_key_multi_page_uses_4up_for_last_page(self):
         """Test splitting 10 mazes across 2 answer key pages: page 11 (6-up) and page 12 (4-up)."""
         with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
@@ -293,6 +313,146 @@ class TestSamplePdfBooklet(unittest.TestCase):
             self.assertIn("ANSWER KEY", key_page12)
             self.assertIn("Maze 7", key_page12)
             self.assertIn("Maze 10", key_page12)
+
+
+class TestEverydayAdventureScenarios(unittest.TestCase):
+    """Test the 10 Everyday Adventures scenarios for children aged 6–9."""
+
+    def test_ten_scenarios_are_unique(self):
+        """Ensure all 10 Everyday Adventure scenarios have distinct titles and instructions."""
+        self.assertEqual(len(EVERYDAY_ADVENTURE_SCENARIOS), 10)
+        titles = [s.title for s in EVERYDAY_ADVENTURE_SCENARIOS]
+        instructions = [s.instruction for s in EVERYDAY_ADVENTURE_SCENARIOS]
+
+        self.assertEqual(len(set(titles)), 10, f"Duplicate titles: {titles}")
+        self.assertEqual(len(set(instructions)), 10, f"Duplicate instructions: {instructions}")
+
+    def test_difficulty_distribution(self):
+        """Verify 3 Easy, 4 Medium, and 3 Challenging tiers."""
+        easy = [s for s in EVERYDAY_ADVENTURE_SCENARIOS if s.difficulty == MazeDifficulty.EASY]
+        medium = [s for s in EVERYDAY_ADVENTURE_SCENARIOS if s.difficulty == MazeDifficulty.MEDIUM]
+        challenging = [s for s in EVERYDAY_ADVENTURE_SCENARIOS if s.difficulty == MazeDifficulty.CHALLENGING]
+        self.assertEqual(len(easy), 3)
+        self.assertEqual(len(medium), 4)
+        self.assertEqual(len(challenging), 3)
+
+    def test_generated_adventure_mazes_have_unique_titles_and_instructions(self):
+        """Ensure generated adventure mazes 1 through 10 have 100% unique titles and instructions."""
+        mazes = [
+            generate_adventure_maze(f"Maze {i+1}", scenario_index=i, seed=200 + i)
+            for i in range(10)
+        ]
+        titles = [m.title for m in mazes]
+        instructions = [m.instruction for m in mazes]
+        self.assertEqual(len(set(titles)), 10)
+        self.assertEqual(len(set(instructions)), 10)
+
+        # Check expected iconic titles
+        self.assertEqual(mazes[0].title, "Puppy's Backyard Quest")
+        self.assertEqual(mazes[0].start_icon, "puppy")
+        self.assertEqual(mazes[0].goal_icon, "bone")
+        self.assertEqual(mazes[7].title, "Cosmic Rocket Odyssey")
+        self.assertEqual(mazes[7].start_icon, "rocket")
+        self.assertEqual(mazes[7].goal_icon, "planet")
+
+
+class TestAdventureIcons(unittest.TestCase):
+    """Test all Everyday Adventure vector icons render cleanly on canvas."""
+
+    def test_all_adventure_icons_render_on_canvas(self):
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+            c = canvas.Canvas(tmp.name, pagesize=(504, 720))
+            for name, draw_fn in ADVENTURE_ICONS.items():
+                draw_fn(c, 252.0, 360.0, 20.0)
+                draw_fn(c, 100.0, 100.0, 12.0)
+            c.showPage()
+            c.save()
+            self.assertGreater(Path(tmp.name).stat().st_size, 0)
+
+
+class TestEverydayAdventuresSafeAreaCompliance(unittest.TestCase):
+    """Test START and FINISH badges for Everyday Adventures respect KDP safe margins."""
+
+    def setUp(self):
+        self.spec = PageSpec.kdp_7x10_recommended(page_count=96)
+
+    def test_adventure_marker_compliance_across_seeds(self):
+        """Test all 10 adventure scenarios across random openings on both odd/even pages."""
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+            c = canvas.Canvas(tmp.name, pagesize=(self.spec.width_points, self.spec.height_points))
+            found_edges = set()
+
+            for idx in range(10):
+                maze = generate_adventure_maze(f"M{idx+1}", scenario_index=idx, seed=1000 + idx)
+                found_edges.add(maze.entrance[0])
+                found_edges.add(maze.exit_[0])
+
+                # Test on both odd page (gutter on left) and even page (gutter on right)
+                for page_num in (1, 2):
+                    render_maze_page(
+                        c,
+                        page_number=page_num,
+                        maze=maze,
+                        page_spec=self.spec,
+                        book_theme="EVERYDAY ADVENTURES",
+                    )
+                    c.showPage()
+
+            c.save()
+
+
+class TestEverydayAdventuresSampleBooklet(unittest.TestCase):
+    """Test generating the complete 12-page Everyday Adventures booklet."""
+
+    def test_sample_pdf_build_and_specifications(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            out_pdf = str(Path(tmp_dir) / "test_adventure_sample.pdf")
+            pdf_path, mazes = build_everyday_adventures_sample_pdf(out_pdf, master_seed=2026)
+
+            self.assertEqual(len(mazes), 10)
+            self.assertTrue(Path(pdf_path).exists())
+
+            reader = pypdf.PdfReader(pdf_path)
+            self.assertEqual(len(reader.pages), 12)
+
+            # Check dimensions on all 12 pages
+            for idx, page in enumerate(reader.pages):
+                box = page.mediabox
+                self.assertEqual(float(box.width), 504.0, f"Page {idx+1} width != 504.0 pt")
+                self.assertEqual(float(box.height), 720.0, f"Page {idx+1} height != 720.0 pt")
+
+            # Check text on activity pages
+            page1_text = reader.pages[0].extract_text()
+            self.assertIn("EVERYDAY ADVENTURES", page1_text)
+            self.assertIn("MAZE 1", page1_text)
+            self.assertIn("Puppy's Backyard Quest", page1_text)
+            self.assertIn("START", page1_text)
+            self.assertIn("FINISH", page1_text)
+
+            # Check page 10 unique scenario
+            page10_text = reader.pages[9].extract_text()
+            self.assertIn("MAZE 10", page10_text)
+            self.assertIn("Mountain Peak Lookout", page10_text)
+
+            # Check text on answer key pages (5-up balanced layout)
+            key_page11 = reader.pages[10].extract_text()
+            self.assertIn("ANSWER KEY: EVERYDAY ADVENTURES", key_page11)
+            self.assertIn("Maze 1", key_page11)
+            self.assertIn("Maze 5", key_page11)
+
+            key_page12 = reader.pages[11].extract_text()
+            self.assertIn("ANSWER KEY: EVERYDAY ADVENTURES", key_page12)
+            self.assertIn("Maze 6", key_page12)
+            self.assertIn("Maze 10", key_page12)
+            self.assertIn("Secret Treehouse Meeting", key_page12)
+            self.assertIn("Cosmic Rocket Odyssey", key_page12)
+
+            # Check font embedding
+            fonts = inspect_pdf_fonts(pdf_path)
+            for f in fonts:
+                self.assertTrue(f.embedded)
+                self.assertTrue(f.subset)
+                self.assertFalse(f.name.startswith("Helvetica"))
 
 
 if __name__ == "__main__":
