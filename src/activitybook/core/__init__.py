@@ -10,6 +10,15 @@ from .page_spec import (
     inches_to_points,
     points_to_inches,
 )
+from .fonts import (
+    FONT_BOLD,
+    FONT_ITALIC,
+    FONT_REGULAR,
+    FontInspectionResult,
+    format_font_table,
+    inspect_pdf_fonts,
+    register_activitybook_fonts,
+)
 
 __all__ = [
     "POINTS_PER_INCH",
@@ -20,5 +29,12 @@ __all__ = [
     "get_kdp_minimum_gutter_inches",
     "inches_to_points",
     "points_to_inches",
+    "FONT_BOLD",
+    "FONT_ITALIC",
+    "FONT_REGULAR",
+    "FontInspectionResult",
+    "format_font_table",
+    "inspect_pdf_fonts",
+    "register_activitybook_fonts",
 ]
 

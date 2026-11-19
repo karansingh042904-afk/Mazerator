@@ -9,6 +9,8 @@ from __future__ import annotations
 import math
 from typing import Callable
 
+from activitybook.core.fonts import FONT_BOLD, register_activitybook_fonts
+
 
 def _setup_stroke(c, lw: float = 1.4, fill_white: bool = True) -> None:
     """Standard stroke and fill setup for black-and-white line art."""
@@ -311,7 +313,8 @@ def draw_compass(c, cx: float, cy: float, s: float, lw: float = 1.4) -> None:
     c.line(cx - r * 0.65, cy, cx + r * 0.65, cy)
 
     # "N" label at top
-    c.setFont("Helvetica-Bold", s * 0.28)
+    register_activitybook_fonts()
+    c.setFont(FONT_BOLD, s * 0.28)
     c.setFillColorRGB(0, 0, 0)
     c.drawCentredString(cx, cy + r + 2.0, "N")
 

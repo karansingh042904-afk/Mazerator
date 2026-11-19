@@ -16,6 +16,12 @@ from typing import Optional
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
+from activitybook.core.fonts import (
+    FONT_BOLD,
+    FONT_ITALIC,
+    FONT_REGULAR,
+    register_activitybook_fonts,
+)
 from activitybook.core.page_spec import PageSpec, inches_to_points
 from activitybook.activities.road_trip_icons import (
     ROAD_TRIP_ICONS,
@@ -282,13 +288,14 @@ def render_maze_page(
 
     Enforces 100% KDP margin safety on all elements including START and FINISH badges.
     """
+    register_activitybook_fonts()
     content = page_spec.get_content_rect(page_number)
     n = maze.grid_size
 
     # 1. Header Band
     # Running category tracker
     subhead_y = content.y1 - 10.0
-    c.setFont("Helvetica-Bold", 8.0)
+    c.setFont(FONT_BOLD, 8.0)
     c.setFillColorRGB(0.35, 0.35, 0.35)
     c.drawCentredString(
         content.x0 + content.width / 2.0,
@@ -298,7 +305,7 @@ def render_maze_page(
 
     # Activity Title
     title_y = subhead_y - 17.0
-    c.setFont("Helvetica-Bold", 14.0)
+    c.setFont(FONT_BOLD, 14.0)
     c.setFillColorRGB(0.0, 0.0, 0.0)
     c.drawCentredString(
         content.x0 + content.width / 2.0,
@@ -308,7 +315,7 @@ def render_maze_page(
 
     # Scenario Instruction (distinct scenario subtitle)
     inst_y = title_y - 14.0
-    c.setFont("Helvetica-Oblique", 9.0)
+    c.setFont(FONT_ITALIC, 9.0)
     c.setFillColorRGB(0.25, 0.25, 0.25)
     c.drawCentredString(
         content.x0 + content.width / 2.0,
@@ -318,10 +325,10 @@ def render_maze_page(
 
     # Difficulty stars badge
     stars_y = inst_y - 15.0
-    c.setFont("Helvetica", 8.5)
+    c.setFont(FONT_REGULAR, 8.5)
     c.setFillColorRGB(0.2, 0.2, 0.2)
     label_text = f"Difficulty: {maze.difficulty.display_name}  "
-    lw_str = stringWidth(label_text, "Helvetica", 8.5)
+    lw_str = stringWidth(label_text, FONT_REGULAR, 8.5)
     c.drawString(content.x0 + content.width / 2.0 - lw_str - 12.0, stars_y - 2.5, label_text)
     _draw_star_rating(c, content.x0 + content.width / 2.0 + 16.0, stars_y, maze.difficulty.stars, max_stars=3, r=4.0)
 
@@ -361,7 +368,7 @@ def render_maze_page(
     def _place_safe_badge(opening_pt, icon_fn, label: str):
         px, py, edge = opening_pt
         icon_size = 11.0
-        label_font = "Helvetica-Bold"
+        label_font = FONT_BOLD
         label_size = 7.5
         label_w = stringWidth(label, label_font, label_size)
 
@@ -449,13 +456,13 @@ def render_maze_page(
 
     # 5. Footer (Page number & reproducibility seed)
     footer_y = content.y0 + 8.0
-    c.setFont("Helvetica", 9.0)
+    c.setFont(FONT_REGULAR, 9.0)
     c.setFillColorRGB(0.2, 0.2, 0.2)
     page_str = f"{page_number}" if total_pages is None else f"{page_number} of {total_pages}"
     c.drawCentredString(content.x0 + content.width / 2.0, footer_y, page_str)
 
     # Seed reference for exact reproducibility
-    c.setFont("Helvetica", 6.5)
+    c.setFont(FONT_REGULAR, 6.5)
     c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(content.x1, footer_y, f"Seed: {maze.seed}")
 
@@ -464,7 +471,7 @@ def render_maze_page(
 
 
 def build_road_trip_sample_pdf(
-    output_path: str = "output/road_trip_mazes_sample_v2.pdf",
+    output_path: str = "output/road_trip_mazes_sample_v3.pdf",
     page_spec: PageSpec | None = None,
     master_seed: int = 2026,
 ) -> tuple[str, list[MazeData]]:
@@ -503,7 +510,12 @@ def build_road_trip_sample_pdf(
 
     total_pages = 10 + 2  # 10 maze pages + 2 answer key pages
 
-    c = canvas.Canvas(str(out_file), pagesize=(page_spec.width_points, page_spec.height_points))
+    register_activitybook_fonts()
+    c = canvas.Canvas(
+        str(out_file),
+        pagesize=(page_spec.width_points, page_spec.height_points),
+        initialFontName=FONT_REGULAR,
+    )
     c.setTitle("Road Trip Quest - Mazes & Answer Key")
 
     # Render 10 maze pages

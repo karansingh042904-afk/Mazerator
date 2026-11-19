@@ -12,6 +12,12 @@ from typing import Sequence
 
 from reportlab.pdfgen import canvas
 
+from activitybook.core.fonts import (
+    FONT_BOLD,
+    FONT_ITALIC,
+    FONT_REGULAR,
+    register_activitybook_fonts,
+)
 from activitybook.core.page_spec import PageSpec
 from activitybook.activities.maze_activity import MazeData
 from maze_generator import generate_mazes as gm
@@ -26,6 +32,7 @@ def render_maze_solution_thumbnail(
     solution_lw: float = 2.2,
 ) -> None:
     """Render a miniature maze grid with the actual solution path drawn bold."""
+    register_activitybook_fonts()
     n = maze.grid_size
     cw = side / float(n)
     ch = side / float(n)
@@ -96,7 +103,7 @@ def render_maze_solution_thumbnail(
         marker_r = min(cw * 0.42, 6.0)
         c.setFillColorRGB(0.0, 0.0, 0.0)
         c.circle(start_x, start_y, marker_r, stroke=1, fill=1)
-        c.setFont("Helvetica-Bold", marker_r * 1.3)
+        c.setFont(FONT_BOLD, marker_r * 1.3)
         c.setFillColorRGB(1.0, 1.0, 1.0)
         c.drawCentredString(start_x, start_y - marker_r * 0.45, "S")
 
@@ -104,7 +111,7 @@ def render_maze_solution_thumbnail(
         goal_x, goal_y = cell_center(*maze.solution_path[-1])
         c.setFillColorRGB(1.0, 1.0, 1.0)
         c.circle(goal_x, goal_y, marker_r, stroke=1, fill=1)
-        c.setFont("Helvetica-Bold", marker_r * 1.3)
+        c.setFont(FONT_BOLD, marker_r * 1.3)
         c.setFillColorRGB(0.0, 0.0, 0.0)
         c.drawCentredString(goal_x, goal_y - marker_r * 0.45, "F")
 
@@ -126,15 +133,16 @@ def render_answer_key_page(
     - 'auto': automatically chooses '4-up' if len(mazes) <= 4, otherwise '6-up'.
     """
     content = page_spec.get_content_rect(page_number)
+    register_activitybook_fonts()
 
     # 1. Header
     header_y = content.y1 - 12.0
-    c.setFont("Helvetica-Bold", 14.0)
+    c.setFont(FONT_BOLD, 14.0)
     c.setFillColorRGB(0.0, 0.0, 0.0)
     c.drawCentredString(content.x0 + content.width / 2.0, header_y, title)
 
     # Subtitle line
-    c.setFont("Helvetica", 9.0)
+    c.setFont(FONT_REGULAR, 9.0)
     c.setFillColorRGB(0.3, 0.3, 0.3)
     c.drawCentredString(
         content.x0 + content.width / 2.0,
@@ -186,7 +194,7 @@ def render_answer_key_page(
             v_pad = (row_height - block_h) / 2.0
 
             label_y = cell_y_top - v_pad - 11.0
-            c.setFont("Helvetica-Bold", 10.5)
+            c.setFont(FONT_BOLD, 10.5)
             c.setFillColorRGB(0.0, 0.0, 0.0)
             c.drawCentredString(
                 cell_x0 + col_width / 2.0,
@@ -196,7 +204,7 @@ def render_answer_key_page(
 
             # Scenario title line
             sub_y = label_y - 12.0
-            c.setFont("Helvetica-Oblique", 8.5)
+            c.setFont(FONT_ITALIC, 8.5)
             c.setFillColorRGB(0.3, 0.3, 0.3)
             c.drawCentredString(
                 cell_x0 + col_width / 2.0,
@@ -212,7 +220,7 @@ def render_answer_key_page(
             v_pad = (row_height - block_h) / 2.0
 
             label_y = cell_y_top - v_pad - 10.0
-            c.setFont("Helvetica-Bold", 9.5)
+            c.setFont(FONT_BOLD, 9.5)
             c.setFillColorRGB(0.0, 0.0, 0.0)
             c.drawCentredString(
                 cell_x0 + col_width / 2.0,
@@ -237,7 +245,7 @@ def render_answer_key_page(
 
     # 4. Footer
     footer_y = content.y0 + 8.0
-    c.setFont("Helvetica", 9.0)
+    c.setFont(FONT_REGULAR, 9.0)
     c.setFillColorRGB(0.2, 0.2, 0.2)
     page_str = f"Page {page_number}" if total_pages is None else f"Page {page_number} of {total_pages}"
     c.drawCentredString(content.x0 + content.width / 2.0, footer_y, page_str)
